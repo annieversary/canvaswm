@@ -113,19 +113,24 @@ func clippedFrame(virtualPos: CGPoint, size: CGSize) -> (CGPoint, CGSize)? {
         let sLeft   = vf.origin.x
         let sRight  = vf.origin.x + vf.width
 
-        let clipLeft   = max(virtualPos.x, sLeft)
-        let clipTop    = max(virtualPos.y, sTop)
-        let clipRight  = min(virtualPos.x + size.width, sRight)
-        let clipBottom = min(virtualPos.y + size.height, sBottom)
+        // Title bar must be above screen bottom — once it goes below, park instead
+        guard virtualPos.y < sBottom else { continue }
 
-        let w = clipRight - clipLeft
-        let h = clipBottom - clipTop
-        if w > 0 && h > 0 {
-            let area = w * h
-            if area > bestArea {
-                bestArea = area
-                bestResult = (CGPoint(x: clipLeft, y: clipTop), CGSize(width: w, height: h))
-            }
+        // Horizontal: check overlap but don't clip — macOS handles windows off the sides
+        let horizOverlapLeft  = max(virtualPos.x, sLeft)
+        let horizOverlapRight = min(virtualPos.x + size.width, sRight)
+        guard horizOverlapRight > horizOverlapLeft else { continue }
+
+        // Vertical: clip only the top edge; bottom extends freely
+        let clipTop     = max(virtualPos.y, sTop)
+        let vertOverlap = min(virtualPos.y + size.height, sBottom) - clipTop
+        guard vertOverlap > 0 else { continue }
+
+        let area = (horizOverlapRight - horizOverlapLeft) * vertOverlap
+        if area > bestArea {
+            bestArea = area
+            let retH = (virtualPos.y + size.height) - clipTop
+            bestResult = (CGPoint(x: virtualPos.x, y: clipTop), CGSize(width: size.width, height: retH))
         }
     }
     return bestResult
